@@ -10,7 +10,7 @@ function elt(tag, cls, text){const x=document.createElement(tag);if(cls)x.classN
 function imgEl(src,alt){let im=elt('img');im.loading='lazy';im.src=src;im.alt=alt;return im}
 function card(r){
  const b=elt('button','evidence-card');b.type='button';b.setAttribute('aria-label','Deschide '+r.title);b.onclick=()=>openModal(r);
- const med=elt('div','evidence-media');const img=fileUrl(r.thumbnail||r.path);
+ const med=elt('div','evidence-media');const img=fileUrl(r.thumbnail||(/\.(?:jpe?g|png|webp)$/i.test(r.path||'')?r.path:''));
  if(img)med.append(imgEl(img,r.title));else med.append(elt('div','empty-preview',r.type==='link'?'↗':'▤'));
  med.append(elt('span','type-pill',typeName(r.type)));if(r.type==='video')med.append(elt('div','play-indicator','▶'));b.append(med);
  const content=elt('div','evidence-info');const meta=elt('div','evidence-meta');meta.append(elt('span','',fmtDate(r.date)),elt('span','',r.id));content.append(meta);
