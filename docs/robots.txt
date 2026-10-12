@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+
+Sitemap: https://noonenobody121.github.io/ASE-PLOSNITE/sitemap.xml
