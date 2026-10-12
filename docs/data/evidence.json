@@ -831,7 +831,10 @@
       "reviewNote": "",
       "path": "media/ase-039-ase-cladirea-2-5-10-2026-plosnite-moarte-etaj-1-video-d.mp4",
       "thumbnail": "media/ase-039-ase-cladirea-2-5-10-2026-plosnite-moarte-etaj-1-video-d-poster.jpg",
-      "createdAt": "2026-10-12T00:00:00Z"
+      "createdAt": "2026-10-12T00:00:00Z",
+      "relatedIds": [
+        "ASE-044"
+      ]
     },
     {
       "id": "ASE-040",
@@ -1260,7 +1263,7 @@
       "category": "teren",
       "date": "",
       "location": "Neconfirmată",
-      "description": "Fotografie proprie, realizată de administratorul arhivei. Pe suprafața unui scaun se observă insecte asemănătoare ploșnițelor. Specia nu este identificată.",
+      "description": "Fotografie proprie, realizată de administratorul arhivei. Pe suprafața unui scaun se observă insecte asemănătoare ploșnițelor. Specia nu este identificată. Conform administratorului arhivei, fotografia este din zona filmată în materialul conex ASE-039.",
       "source": "Fotografie proprie (administratorul arhivei)",
       "filename": "Fotografie proprie",
       "originalNames": [],
@@ -1271,7 +1274,10 @@
       "path": "media/ase-044-scaun-fotografie-proprie.jpg",
       "thumbnail": "",
       "url": "",
-      "createdAt": "2026-10-13T00:00:00Z"
+      "createdAt": "2026-10-13T00:00:00Z",
+      "relatedIds": [
+        "ASE-039"
+      ]
     }
   ]
 }
