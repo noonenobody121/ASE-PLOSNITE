@@ -833,7 +833,8 @@
       "thumbnail": "media/ase-039-ase-cladirea-2-5-10-2026-plosnite-moarte-etaj-1-video-d-poster.jpg",
       "createdAt": "2026-10-12T00:00:00Z",
       "relatedIds": [
-        "ASE-044"
+        "ASE-044",
+        "ASE-045"
       ]
     },
     {
@@ -1272,6 +1273,29 @@
       "status": "published",
       "reviewNote": "",
       "path": "media/ase-044-scaun-fotografie-proprie.jpg",
+      "thumbnail": "",
+      "url": "",
+      "createdAt": "2026-10-13T00:00:00Z",
+      "relatedIds": [
+        "ASE-039"
+      ]
+    },
+    {
+      "id": "ASE-045",
+      "title": "Fotografie din spațiul universitar — persoane fotografiind o priză",
+      "type": "foto",
+      "category": "teren",
+      "date": "2026-10-05",
+      "location": "Neconfirmată",
+      "description": "Fotografie realizată de administratorul arhivei, 5 octombrie 2026. Fețele persoanelor au fost estompate. Fotografia nu arată ploșnițe. Conform administratorului arhivei, fotografia este legată de materialul video ASE-039.",
+      "source": "Fotografie proprie (administratorul arhivei)",
+      "filename": "Fotografie proprie",
+      "originalNames": [],
+      "sha256": "",
+      "bytes": 309270,
+      "status": "published",
+      "reviewNote": "",
+      "path": "media/ase-045-fotografie-estompata.jpg",
       "thumbnail": "",
       "url": "",
       "createdAt": "2026-10-13T00:00:00Z",
