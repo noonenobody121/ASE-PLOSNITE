@@ -1252,6 +1252,26 @@
       "url": "https://www.g4media.ro/conducerea-ase-neaga-informatia-ca-spatiile-facutatii-sunt-infestate-cu-plosnite-verificarile-efectuate-nu-au-evidentiat-insecte-si-nici-alte-indicii-care-sa-confirme-existenta-unei-infestari-mobil.html",
       "embed": true,
       "description": "Articol de presă despre sesizările privind ploșnițele la ASE. Materialul aparține publicației G4Media; pe acest site este doar linkul."
+    },
+    {
+      "id": "ASE-044",
+      "title": "Fotografie — scaun cu insecte asemănătoare ploșnițelor",
+      "type": "foto",
+      "category": "teren",
+      "date": "",
+      "location": "Neconfirmată",
+      "description": "Fotografie proprie, realizată de administratorul arhivei. Pe suprafața unui scaun se observă insecte asemănătoare ploșnițelor. Specia nu este identificată.",
+      "source": "Fotografie proprie (administratorul arhivei)",
+      "filename": "Fotografie proprie",
+      "originalNames": [],
+      "sha256": "",
+      "bytes": 54068,
+      "status": "published",
+      "reviewNote": "",
+      "path": "media/ase-044-scaun-fotografie-proprie.jpg",
+      "thumbnail": "",
+      "url": "",
+      "createdAt": "2026-10-13T00:00:00Z"
     }
   ]
 }
