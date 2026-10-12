@@ -937,6 +937,48 @@
       "thumbnail": "",
       "url": "https://www.petitieonline.com/ore_online_in_ase_pan_la_rezolvarea_infestatiei_de_plonite",
       "createdAt": "2026-10-12T00:00:00Z"
+    },
+    {
+      "originalNames": [],
+      "sha256": "",
+      "bytes": 0,
+      "reviewNote": "",
+      "path": "",
+      "thumbnail": "",
+      "createdAt": "2026-10-12T00:00:00Z",
+      "category": "presa",
+      "type": "link",
+      "status": "published",
+      "embed": true,
+      "id": "PRS-001",
+      "title": "Reportaj Digi24: studenții ASE reclamă ploșnițe (copie arhivată)",
+      "date": "2026-10-02",
+      "location": "Online — Digi24 (arhivă web)",
+      "description": "Reportaj difuzat de Digi24 la 2 octombrie 2026 despre sesizările studenților privind ploșnițele din clădirile ASE. Linkul duce la copia arhivată a paginii, deoarece pagina originală nu mai este disponibilă. Materialul aparține Digi24; pe acest site este doar linkul.",
+      "source": "Digi24 (copie arhivată Wayback Machine)",
+      "filename": "Reportaj Digi24 (sursă externă)",
+      "url": "https://web.archive.org/web/20261002174150/https://www.digi24.ro/video/studentii-de-la-ase-reclama-plosnite-intr-una-dintre-cladirile-institutiei-reactia-decanului-universitatii-3973525"
+    },
+    {
+      "originalNames": [],
+      "sha256": "",
+      "bytes": 0,
+      "reviewNote": "",
+      "path": "",
+      "thumbnail": "",
+      "createdAt": "2026-10-12T00:00:00Z",
+      "category": "presa",
+      "type": "link",
+      "status": "published",
+      "embed": true,
+      "id": "PRS-002",
+      "title": "Reportaj Stirile ProTV: alertă de ploșnițe la ASE",
+      "date": "2026-10-02",
+      "location": "Online — Stirile ProTV",
+      "description": "Reportaj Stirile ProTV despre sesizările studenților ASE privind ploșnițele și cererea de cursuri online. Materialul aparține Stirile ProTV; pe acest site este doar linkul.",
+      "source": "Stirile ProTV",
+      "filename": "Reportaj Stirile ProTV (sursă externă)",
+      "url": "https://stirileprotv.ro/video/play/alerta-de-plosnite-si-la-ase-mii-de-studenti-cer-cursuri-online-pana-la-remedierea-situatiei-reactia-universitatii/"
     }
   ]
 }
