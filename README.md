@@ -1,4 +1,4 @@
-# DOSAR PUBLIC / ASE — GitHub Pages + Cloudflare Access + Worker
+# DOSAR PUBLIC / ASE — GitHub Pages + Cloudflare Worker
 
 Website static în română, cu galerie, cronologie, filtre, fișe detaliate, surse și link / previzualizare live pentru petiția publică. Panoul `/admin/` editează catalogul printr-un **Cloudflare Worker** care scrie în GitHub. Pagina publică poate fi găzduită pe **GitHub Pages**, fără server propriu.
 
@@ -8,7 +8,7 @@ Website static în română, cu galerie, cronologie, filtre, fișe detaliate, su
 - `docs/admin/index.html` — interfață de administrare.
 - `docs/data/evidence.json` — catalog cu **44 de intrări**: **43 de fișiere unice** rezultate din 56 fișiere inițiale (13 duplicate byte-cu-byte), plus petiția externă.
 - `docs/media/` — **24 de înregistrări cu fișiere publicabile și previzualizări**, plus miniaturi; linkul petiției este a 25-a înregistrare publică. Fișierele aflate în revizuire sunt menționate doar în catalog, **nu sunt copiate în site**.
-- `worker/src/index.js` — API protejat prin JWT Cloudflare Access, cu verificarea semnăturii prin JWKS, verificarea audienței și restricționare la emailuri aprobate; CRUD pentru catalog, încărcare și ștergere de fișiere din depozitul GitHub.
+- `worker/src/index.js` — API protejat printr-o parolă de administrator (secretul `PAROLA`), cu comparare în timp constant și limitarea încercărilor în KV; CRUD pentru catalog, încărcare și ștergere de fișiere din depozitul GitHub.
 - `tools/build_evidence.py` — script opțional de reimport inițial, care grupează duplicatele după SHA-256. **Suprascrie catalogul**, nu este destinat importurilor zilnice.
 
 **Precizare editorială importantă:** Cele 19 fișiere unice marcate cu `review` pot include date personale, fragmente de conversații, materiale de presă protejate de drepturi de autor sau afirmații sensibile despre persoane. Nu le publica înainte de revizuire și, unde e necesar, anonimizare și obținerea drepturilor. Inventarul lor este disponibil doar din editor și prin datele JSON (titluri/denumiri/descrieri); conținutul brut nu este livrat sub `docs/`. Originalele rămân în arhiva ZIP furnizată de tine. **Repo-ul public include manifestul JSON**, deci pentru date sensibile din metadate modifică sau elimină acele câmpuri înainte de primul `git push`.
@@ -34,7 +34,7 @@ Website static în română, cu galerie, cronologie, filtre, fișe detaliate, su
 3. În **Settings → Pages → Build and deployment**, alege **Deploy from a branch**, `main`, directorul **`/docs`**. Așteaptă publicarea.
 4. Pagina publică este de forma `https://OWNER.github.io/dosar-ase/`. Fișierele existente, filtrarea, cronologia și linkul petiției sunt funcționale fără Worker.
 
-**Recomandat pentru autentificare:** configurează în **Settings → Pages → Custom domain** adresa `dovezi.example.ro`, prin DNS, astfel încât să poți avea Worker pe `api.dovezi.example.ro`. Două subdomenii ale aceluiași domeniu reduc problemele cu cookie-urile Cloudflare Access față de combinația `github.io` + `workers.dev`. `SITE_ORIGIN` din Worker trebuie să fie **identic**, cu schemă HTTPS și fără slash la final, cu originea din browser.
+**Adresa site-ului:** implicit `https://OWNER.github.io/dosar-ase/`, fără domeniu propriu. Dacă adaugi un domeniu în **Settings → Pages → Custom domain**, schimbă `SITE_ORIGIN` din Worker astfel încât să fie **identic** cu originea din browser (schemă HTTPS, fără cale și fără slash la final).
 
 ## Pasul 2 — Creează un token GitHub cu permisiuni minime
 
@@ -52,9 +52,10 @@ Ai nevoie de un cont Cloudflare și de Node.js 20+.
 ```bash
 cd worker
 cp wrangler.toml.example wrangler.toml
-# editează GITHUB_REPO, GITHUB_BRANCH, SITE_ORIGIN,
-# CF_ACCESS_ISSUER, CF_ACCESS_AUD, ADMIN_EMAILS
+# editează GITHUB_REPO, GITHUB_BRANCH, SITE_ORIGIN și id-ul KV din [[kv_namespaces]]
 npx wrangler login
+npx wrangler kv namespace create LIMITE
+npx wrangler secret put PAROLA
 npx wrangler secret put GITHUB_TOKEN
 npx wrangler deploy
 ```
@@ -67,25 +68,26 @@ Configurația se referă la:
 | --- | --- |
 | `GITHUB_REPO` | `OWNER/dosar-ase` |
 | `GITHUB_BRANCH` | `main` |
-| `SITE_ORIGIN` | `https://dovezi.example.ro` |
-| `CF_ACCESS_ISSUER` | `https://TEAM.cloudflareaccess.com` |
-| `CF_ACCESS_AUD` | **Application Audience (AUD) Tag** din Access |
-| `ADMIN_EMAILS` | Lista emailurilor de administrator, separate prin virgulă |
+| `SITE_ORIGIN` | Originea paginii de admin, fără cale: `https://OWNER.github.io` |
+| `PAROLA` | **Secret** Cloudflare Worker: parola administratorului (`wrangler secret put PAROLA`) |
 | `GITHUB_TOKEN` | **Secret** Cloudflare Worker, nu o variabilă `[vars]` |
+| binding `LIMITE` | Namespace KV pentru limitarea încercărilor de parolă (12 greșite pe IP, la 5 minute) |
 
-Asociază un **custom domain** Worker-ului: `api.dovezi.example.ro` din Cloudflare Dashboard → Workers & Pages → Worker → Settings → Domains & Routes (terminologia poate varia).
+## Pasul 4 — Parola administratorului
 
-## Pasul 4 — Activează Cloudflare Access (obligatoriu)
+Nu sunt necesare Cloudflare Access, echipă Zero Trust sau conturi suplimentare. Adminul se conectează cu o parolă, păstrată ca secret pe Worker:
 
-1. Cloudflare Zero Trust → **Access → Applications → Add an application → Self-hosted**.
-2. Protejează `api.dovezi.example.ro` (inclusiv `/api/*`).
-3. Creează o **Allow policy** limitată strict la adresele tale de email/identitățile aprobate; activează login OTP sau un Identity Provider controlat. Nu crea o politică globală „Everyone”.
-4. Copiază **Application Audience (AUD) Tag** în `CF_ACCESS_AUD` și **Team domain** în `CF_ACCESS_ISSUER`.
-5. Asigură-te că preflight **OPTIONS** către API este tratat fără redirecționare de login, pentru CORS (de ex. opțiunea Access dedicată preflight requests / bypass OPTIONS; nu aplica bypass celorlalte metode). Worker răspunde singur la OPTIONS.
-6. Publică din nou Worker după configurare: `npx wrangler deploy`.
-7. În `https://dovezi.example.ro/admin/`, introdu `https://api.dovezi.example.ro` și salvează URL-ul. Apasă **1. Autentifică-te** și finalizează loginul în fereastra nouă, apoi **2. Conectează-te**.
+```bash
+cd worker
+npx wrangler secret put PAROLA
+```
 
-**Securitate:** `/admin/` este o interfață statică public accesibilă, dar toate operațiunile de citire/editare prin API solicită un JWT valid **semnat de Cloudflare Access**, emis pentru audiența corectă și asociat unui email din `ADMIN_EMAILS`. API-ul respinge originile neautorizate. Tokenul GitHub rămâne server-side. Ascunderea butoanelor nu este măsură de securitate: Worker-ul verifică fiecare cerere.
+Folosește o parolă lungă și unică, generată de un manager de parole (de ex. 20+ caractere). Parola nu se pune în cod, în `wrangler.toml` sau în pagina statică.
+
+1. Deschide `https://OWNER.github.io/dosar-ase/admin/` și verifică URL-ul Worker-ului (`https://ase-dosar-admin-api.<subdomeniu>.workers.dev`).
+2. Introdu parola și apasă **Conectează-te**. Parola nu este salvată în browser: se pierde la reîncărcarea paginii.
+
+**Securitate:** fiecare cerere la `/api/*` trebuie să trimită antetul `x-parola` cu parola corectă, altfel primește 401. Worker-ul acceptă cereri doar de la `SITE_ORIGIN`. Tokenul GitHub și parola rămân în secretele Worker-ului. Cine are parola poate modifica catalogul, deci schimb-o imediat dacă a fost expusă (`npx wrangler secret put PAROLA`).
 
 ## Pasul 5 — Adaugă sau modifică dovezi
 

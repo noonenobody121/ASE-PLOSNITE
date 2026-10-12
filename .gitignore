@@ -1,0 +1,7 @@
+worker/wrangler.toml
+worker/.wrangler/
+node_modules/
+.env
+.env.*
+.DS_Store
+*.zip

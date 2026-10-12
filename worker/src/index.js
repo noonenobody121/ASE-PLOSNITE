@@ -1,39 +1,33 @@
-/** Cloudflare Worker: edit GitHub Pages evidence catalogue, authenticated with Cloudflare Access.
- * Deploy behind a Cloudflare Access application; verify its JWT on every protected request.
- * No GitHub token is ever delivered to the browser.
+/** Cloudflare Worker: editare catalog GitHub Pages, protejat printr-o parolă de administrator.
+ * Parola (secretul PAROLA) vine în antetul x-parola, peste HTTPS, și e comparată în timp constant.
+ * Încercările eșuate sunt limitate pe IP în KV (binding LIMITE).
+ * Tokenul GitHub stă în secretul GITHUB_TOKEN; niciun secret nu ajunge în browser.
  */
 const ENCODER = new TextEncoder();
-let jwksCache = {issuer:'',at:0,keys:[]};
+const MAX_INCERCARI = 12;
+const FEREASTRA_MS = 5 * 60 * 1000;
 const reply = (value,status=200,headers={}) => new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff',...headers}});
-const b64uToBytes = s => Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
 const bytesToBase64 = buf => {const bytes=new Uint8Array(buf);let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(out)};
 const textToBase64 = s => bytesToBase64(ENCODER.encode(s));
 const base64ToText = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s+/g,'')),c=>c.charCodeAt(0)));
 const fail=(status,message)=>{throw Object.assign(Error(message),{status})};
-async function verifyAccess(request,env){
- const issuer=(env.CF_ACCESS_ISSUER||'').replace(/\/$/,''); // https://<team>.cloudflareaccess.com
- const audience=env.CF_ACCESS_AUD;
- if(!issuer.startsWith('https://')||!audience)fail(500,'Cloudflare Access nu este configurat.');
- const token=request.headers.get('cf-access-jwt-assertion');
- if(!token)fail(401,'Autentificare necesară. Deschide mai întâi pagina de login Cloudflare Access.');
- const segments=token.split('.');if(segments.length!==3)fail(401,'JWT invalid.');
- let header,payload;
- try{header=JSON.parse(new TextDecoder().decode(b64uToBytes(segments[0])));payload=JSON.parse(new TextDecoder().decode(b64uToBytes(segments[1])))}catch{fail(401,'JWT invalid.')}
- if(header.alg!=='RS256'||!header.kid)fail(401,'Algoritm JWT nepermis.');
- const now=Math.floor(Date.now()/1000);
- if(payload.iss!==issuer||!Array.isArray(payload.aud)||!payload.aud.includes(audience)||typeof payload.exp!=='number'||payload.exp<=now||typeof payload.iat!=='number'||payload.iat>now+60||(payload.nbf&&payload.nbf>now+60))fail(401,'Token expirată sau emis de alt furnizor.');
- if(jwksCache.issuer!==issuer||Date.now()-jwksCache.at>300000){
-  const r=await fetch(issuer+'/cdn-cgi/access/certs');if(!r.ok)fail(502,'Nu se pot verifica cheile Cloudflare Access.');
-  const j=await r.json();if(!Array.isArray(j.keys))fail(502,'JWKS invalid.');jwksCache={issuer,keys:j.keys,at:Date.now()};
- }
- const jwk=jwksCache.keys.find(k=>k.kid===header.kid&&k.kty==='RSA');if(!jwk)fail(401,'Semnătură JWT necunoscută.');
- const key=await crypto.subtle.importKey('jwk',jwk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
- const ok=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,b64uToBytes(segments[2]),ENCODER.encode(segments[0]+'.'+segments[1]));if(!ok)fail(401,'Semnătură JWT invalidă.');
- const email=(payload.email||'').toLowerCase();const allowed=(env.ADMIN_EMAILS||'').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean);
- if(!email||!allowed.length||!allowed.includes(email))fail(403,'Contul nu este pe lista administratorilor.');
- return {email,sub:payload.sub};
+
+/** Compară în timp constant. Nu scurtcircuităm la lungimi diferite, ca lungimea parolei să nu fie măsurabilă. */
+function egal(a,b){if(typeof a!=='string'||typeof b!=='string')return false;const n=Math.max(a.length,b.length);let dif=a.length===b.length?0:1;for(let i=0;i<n;i++)dif|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return dif===0}
+
+/* Limitarea încercărilor în KV: starea trebuie să fie comună tuturor izolatelor Worker-ului. */
+async function esteBlocat(env,ip){if(!env.LIMITE)return false;const t=await env.LIMITE.get(`i:${ip}`,'json');if(!t||Date.now()-t.t>FEREASTRA_MS)return false;return t.n>=MAX_INCERCARI}
+async function noteazaEsec(env,ip){if(!env.LIMITE)return;const cheie=`i:${ip}`;const acum=Date.now();const t=await env.LIMITE.get(cheie,'json');const activa=t&&acum-t.t<=FEREASTRA_MS;await env.LIMITE.put(cheie,JSON.stringify({t:activa?t.t:acum,n:activa?t.n+1:1}),{expirationTtl:600})}
+async function reseteaza(env,ip){if(env.LIMITE)await env.LIMITE.delete(`i:${ip}`)}
+
+async function verificaParola(request,env,ip){
+ if(!env.PAROLA)fail(500,'Parola administratorului nu este configurată (secretul PAROLA).');
+ if(await esteBlocat(env,ip))fail(429,'Prea multe încercări. Așteaptă câteva minute.');
+ if(!egal(request.headers.get('x-parola'),env.PAROLA)){await noteazaEsec(env,ip);fail(401,'Parolă greșită.')}
+ await reseteaza(env,ip);
 }
-function cors(request,env){const origin=request.headers.get('origin');const allowed=(env.SITE_ORIGIN||'').replace(/\/$/,'');if(origin&&origin===allowed)return {'access-control-allow-origin':origin,'access-control-allow-credentials':'true','access-control-allow-methods':'GET,PUT,POST,DELETE,OPTIONS','access-control-allow-headers':'content-type','access-control-max-age':'600','vary':'Origin'};return {vary:'Origin'}}
+
+function cors(request,env){const origin=request.headers.get('origin');const allowed=(env.SITE_ORIGIN||'').replace(/\/$/,'');if(origin&&origin===allowed)return {'access-control-allow-origin':origin,'access-control-allow-methods':'GET,PUT,POST,DELETE,OPTIONS','access-control-allow-headers':'content-type, x-parola','access-control-max-age':'600','vary':'Origin'};return {vary:'Origin'}}
 function ghSettings(env){if(!/^[a-z\d_.-]+\/[a-z\d_.-]+$/i.test(env.GITHUB_REPO||'')||!env.GITHUB_TOKEN)fail(500,'GitHub nu este configurat.');return {repo:env.GITHUB_REPO,branch:env.GITHUB_BRANCH||'main',manifest:'docs/data/evidence.json'}}
 async function github(env,route,{method='GET',body}={}){
  const {repo}=ghSettings(env);const r=await fetch(`https://api.github.com/repos/${repo}/${route}`,{method,headers:{'authorization':'Bearer '+env.GITHUB_TOKEN,'accept':'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'ase-dosar-cloudflare-worker','content-type':'application/json'},body:body?JSON.stringify(body):undefined});
@@ -54,32 +48,32 @@ function validateManifest(m){if(!m||!Array.isArray(m.evidence)||m.evidence.lengt
  if(e.status==='published'&&!((e.type==='link'&&e.url)||(e.type!=='link'&&e.path)))fail(400,'Nu poți publica o intrare fără un fișier sau URL: '+e.id);
  }}
 function validateFile(file){if(!file||typeof file.name!=='string')fail(400,'Alege un fișier.');const ext=file.name.split('.').pop().toLowerCase();const allow={'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','webp':'image/webp','mp4':'video/mp4','webm':'video/webm','pdf':'application/pdf','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};if(!allow[ext])fail(400,'Tip neacceptat; SVG/HTML/JavaScript sunt interzise.');if(file.size>15*1024*1024)fail(413,'Fișierul depășește limita de 15 MB / upload.');if(file.size===0)fail(400,'Fișier gol.');return ext}
-function slug(str){return str.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,36)||'fisier'}
+function slug(str){return str.normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,36)||'fisier'}
 export default {async fetch(request,env){const c=cors(request,env);const origin=request.headers.get('origin');const allowed=(env.SITE_ORIGIN||'').replace(/\/$/,'');
  if(origin&&origin!==allowed)return reply({error:'Origine nepermisă.'},403,c);
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers:c});
  try{const url=new URL(request.url);if(!url.pathname.startsWith('/api/'))return reply({error:'Endpoint inexistent.'},404,c);
- // Cloudflare Access must protect /api/* at the edge; JWT is checked again here.
- const user=await verifyAccess(request,env);
- if(url.pathname==='/api/me'&&request.method==='GET')return reply({ok:true,email:user.email},200,c);
+ // Fiecare cerere API trece prin verificarea parolei, inclusiv /api/me folosit la conectare.
+ await verificaParola(request,env,request.headers.get('CF-Connecting-IP')||'necunoscut');
+ if(url.pathname==='/api/me'&&request.method==='GET')return reply({ok:true},200,c);
  if(url.pathname==='/api/evidence'&&request.method==='GET'){const x=await getManifest(env);return reply(x,200,c)}
  if(url.pathname==='/api/evidence'&&request.method==='PUT'){
   const incoming=await request.json();if(typeof incoming.sha!=='string'||incoming.sha.length!==40)fail(400,'SHA GitHub lipsește.');
   const old=await getManifest(env);if(old.sha!==incoming.sha)fail(409,'Catalogul a fost modificat între timp. Reîncarcă.');
   const manifest=incoming.manifest;validateManifest(manifest);manifest.schemaVersion=1;manifest.updatedAt=new Date().toISOString();
-  const s=ghSettings(env);const r=await github(env,`contents/${ghPath(s.manifest)}`,{method:'PUT',body:{message:`Update evidence catalogue by ${user.email}`,content:textToBase64(JSON.stringify(manifest,null,2)+'\n'),sha:old.sha,branch:s.branch}});return reply({ok:true,sha:r.content?.sha||'',updatedAt:manifest.updatedAt},200,c)
+  const s=ghSettings(env);const r=await github(env,`contents/${ghPath(s.manifest)}`,{method:'PUT',body:{message:'Update evidence catalogue (admin panel)',content:textToBase64(JSON.stringify(manifest,null,2)+'\n'),sha:old.sha,branch:s.branch}});return reply({ok:true,sha:r.content?.sha||'',updatedAt:manifest.updatedAt},200,c)
  }
  if(url.pathname==='/api/upload'&&request.method==='POST'){
   const length=Number(request.headers.get('content-length'));if(length>21*1024*1024)fail(413,'Fișier prea mare.');const form=await request.formData();const file=form.get('file');const ext=validateFile(file);
   const path=`docs/media/${Date.now()}-${crypto.randomUUID().slice(0,8)}-${slug(file.name)}.${ext}`;
   const body=await file.arrayBuffer();const s=ghSettings(env);
-  await github(env,`contents/${ghPath(path)}`,{method:'PUT',body:{message:`Upload evidence attachment by ${user.email}`,content:bytesToBase64(body),branch:s.branch}});
+  await github(env,`contents/${ghPath(path)}`,{method:'PUT',body:{message:'Upload evidence attachment (admin panel)',content:bytesToBase64(body),branch:s.branch}});
   return reply({ok:true,path:path.replace(/^docs\//,''),bytes:body.byteLength},201,c)
  }
  if(url.pathname==='/api/media'&&request.method==='DELETE'){
   const path=url.searchParams.get('path')||'';if(!/^media\/[a-zA-Z0-9-]+\.(jpg|jpeg|png|webp|mp4|webm|pdf|docx)$/.test(path))fail(400,'Cale invalidă.');
   const s=ghSettings(env);const remote='docs/'+path;const item=await github(env,`contents/${ghPath(remote)}?ref=${encodeURIComponent(s.branch)}`);
-  const r=await github(env,`contents/${ghPath(remote)}`,{method:'DELETE',body:{message:`Remove media by ${user.email}`,sha:item.sha,branch:s.branch}});return reply({ok:true,commit:r.commit?.sha},200,c)
+  const r=await github(env,`contents/${ghPath(remote)}`,{method:'DELETE',body:{message:'Remove media (admin panel)',sha:item.sha,branch:s.branch}});return reply({ok:true,commit:r.commit?.sha},200,c)
  }
  return reply({error:'Ruta sau metoda nu există.'},404,c)
  }catch(error){const status=Number(error.status)||500;console.error('Worker request error:',status,error.message);return reply({error:error.message||'Eroare internă.'},status,c)}

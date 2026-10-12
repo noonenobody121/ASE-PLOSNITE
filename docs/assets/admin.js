@@ -1,15 +1,17 @@
 'use strict';
 const $=s=>document.querySelector(s);
-const state={api:localStorage.getItem('ase_api_url')||'',manifest:null,sha:'',selected:null,user:null,dirty:false};
-$('#api-url').value=state.api;updateLogin();
+const DEFAULT_API='https://ase-dosar-admin-api.danubelabs.workers.dev';
+const state={api:localStorage.getItem('ase_api_url')||DEFAULT_API,manifest:null,sha:'',selected:null,parola:'',dirty:false};
+$('#api-url').value=state.api;
+$('#parola').addEventListener('keydown',e=>{if(e.key==='Enter')connect()});
 function notify(message,bad=false){const x=$('#message');x.textContent=message;x.style.borderColor=bad?'#b33d3d':'#d86e51'}
 function validateApi(s){try{const u=new URL(s.replace(/\/$/,''));return u.protocol==='https:'?u.origin:''}catch{return ''}}
-function updateLogin(){const a=$('#login-link');const u=validateApi(state.api);a.href=u?u+'/api/me':'#';a.setAttribute('aria-disabled',String(!u))}
-$('#save-config').addEventListener('click',()=>{const u=validateApi($('#api-url').value.trim());if(!u)return notify('Introdu un URL HTTPS valid pentru Worker.',true);state.api=u;localStorage.setItem('ase_api_url',u);updateLogin();notify('URL-ul Worker a fost salvat în browser. Deschide autentificarea Cloudflare, apoi conectează-te.')});
-async function request(path,opts={}){if(!state.api)throw Error('Configurează URL-ul Worker.');let r;try{r=await fetch(state.api+path,{credentials:'include',cache:'no-store',...opts})}catch{throw Error('Nu se poate accesa API-ul. Verifică domeniul, CORS și Cloudflare Access.')};let data={};try{data=await r.json()}catch{}if(!r.ok)throw Error(data.error||'HTTP '+r.status);return data}
+$('#save-config').addEventListener('click',()=>{const u=validateApi($('#api-url').value.trim());if(!u)return notify('Introdu un URL HTTPS valid pentru Worker.',true);state.api=u;localStorage.setItem('ase_api_url',u);notify('URL-ul Worker a fost salvat în browser. Introdu parola și apasă „Conectează-te”.')});
+async function request(path,opts={}){if(!state.api)throw Error('Configurează URL-ul Worker.');const headers={...(opts.headers||{}),'x-parola':state.parola};let r;try{r=await fetch(state.api+path,{cache:'no-store',...opts,headers})}catch{throw Error('Nu se poate accesa API-ul. Verifică URL-ul Worker și conexiunea.')};let data={};try{data=await r.json()}catch{}if(!r.ok)throw Error(data.error||'HTTP '+r.status);return data}
 function setBusy(b){document.querySelectorAll('.workspace button').forEach(x=>x.disabled=b)}
-async function load(){if(state.dirty&&!confirm('Sunt modificări nesalvate. Continui?'))return;setBusy(true);try{const me=await request('/api/me');const obj=await request('/api/evidence');state.user=me.email;state.manifest=obj.manifest;state.sha=obj.sha;state.dirty=false;$('#auth-status').textContent='Autentificat: '+me.email;notify('Conectat. Datele sunt preluate din repository-ul GitHub.');refresh()}catch(e){notify(e.message,true);$('#auth-status').textContent='Neconectat'}finally{setBusy(false)}}
-$('#connect-btn').onclick=load;$('#reload-btn').onclick=load;
+async function load(){if(!state.parola)return notify('Introdu parola de administrator.',true);if(state.dirty&&!confirm('Sunt modificări nesalvate. Continui?'))return;setBusy(true);try{await request('/api/me');const obj=await request('/api/evidence');state.manifest=obj.manifest;state.sha=obj.sha;state.dirty=false;$('#auth-status').textContent='Conectat';notify('Conectat. Datele sunt preluate din repository-ul GitHub.');refresh()}catch(e){notify(e.message,true);$('#auth-status').textContent='Neconectat'}finally{setBusy(false)}}
+function connect(){const p=$('#parola').value;if(!p)return notify('Introdu parola de administrator.',true);state.parola=p;$('#parola').value='';load()}
+$('#connect-btn').onclick=connect;$('#reload-btn').onclick=load;
 const escaping=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function refresh(){const records=state.manifest?.evidence||[];$('#s-total').textContent=records.length;for(const [id,status] of [['s-public','published'],['s-review','review'],['s-draft','draft']])$('#'+id).textContent=records.filter(x=>x.status===status).length;
  const filter=$('#list-filter').value;const q=$('#list-search').value.toLocaleLowerCase('ro');const out=records.filter(r=>(filter==='all'||r.status===filter)&&(!q||[r.id,r.title,r.filename,r.description].join(' ').toLocaleLowerCase('ro').includes(q)));out.sort((a,b)=>((b.date||'').localeCompare(a.date||'')));
